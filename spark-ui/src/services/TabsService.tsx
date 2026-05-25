@@ -1,5 +1,6 @@
 import AdjustIcon from "@mui/icons-material/Adjust";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import ReportIcon from "@mui/icons-material/Report";
 import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
@@ -12,6 +13,7 @@ export enum Tab {
   Resources = "Resources",
   Configuration = "Configuration",
   Alerts = "Alerts",
+  JobCompare = "Job Compare",
 }
 
 export const TabToUrl = {
@@ -20,6 +22,7 @@ export const TabToUrl = {
   [Tab.Configuration]: "/config",
   [Tab.Alerts]: "/alerts",
   [Tab.Resources]: "/resources",
+  [Tab.JobCompare]: "/job-compare",
 };
 
 export const getTabByUrl = (path: string) => {
@@ -34,6 +37,8 @@ export const getTabByUrl = (path: string) => {
       return Tab.Alerts;
     case TabToUrl[Tab.Resources]:
       return Tab.Resources;
+    case TabToUrl[Tab.JobCompare]:
+      return Tab.JobCompare;
     default:
       return isHistoryServer() ? Tab.Summary : Tab.Status;
   }
@@ -51,6 +56,8 @@ export function renderTabIcon(selectedTab: Tab): JSX.Element {
       return <ReportIcon />;
     case Tab.Resources:
       return <PrecisionManufacturingIcon />;
+    case Tab.JobCompare:
+      return <CompareArrowsIcon />;
     default:
       return <div></div>;
   }

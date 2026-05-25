@@ -177,12 +177,29 @@ export function calculateJobsStore(
   jobs: SparkJobs,
 ): SparkJobsStore {
   const jobsStore: SparkJobsStore = jobs.map((job) => {
+    let jobDuration: number | undefined;
+    if (job.submissionTime && job.completionTime) {
+      const start = new Date(job.submissionTime.replace("GMT", "Z")).getTime();
+      const end = new Date(job.completionTime.replace("GMT", "Z")).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+        jobDuration = end - start;
+      }
+    }
     return {
       jobId: job.jobId,
       name: job.name,
       description: job.description,
       status: job.status,
       stageIds: job.stageIds,
+      submissionTime: job.submissionTime,
+      completionTime: job.completionTime,
+      duration: jobDuration,
+      numTasks: job.numTasks,
+      numCompletedTasks: job.numCompletedTasks,
+      numFailedTasks: job.numFailedTasks,
+      numSkippedTasks: job.numSkippedTasks,
+      numCompletedStages: job.numCompletedStages,
+      numFailedStages: job.numFailedStages,
       metrics: calculateJobsMetrics(job.stageIds, stageMetrics),
     };
   });

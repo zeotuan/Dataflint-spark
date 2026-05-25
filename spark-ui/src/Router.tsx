@@ -3,6 +3,7 @@ import { createHashRouter } from "react-router-dom";
 import App from "./App";
 import { AlertsTab } from "./tabs/AlertsTab";
 import ConfigurationTab from "./tabs/ConfigurationTab";
+import { JobCompareTab } from "./tabs/JobCompareTab";
 import { ResourcesTab } from "./tabs/ResourcesTab";
 import StatusTab from "./tabs/StatusTab";
 import SummaryTab from "./tabs/SummaryTab";
@@ -38,6 +39,10 @@ export const reactRouter = createHashRouter([
       {
         path: "/resources",
         element: <ResourcesTab />,
+      },
+      {
+        path: "/job-compare",
+        element: <JobCompareTab />,
       },
     ],
   },

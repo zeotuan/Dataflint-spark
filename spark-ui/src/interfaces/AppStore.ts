@@ -423,6 +423,16 @@ export interface SparkJobStore {
   stageIds: number[];
   status: string;
 
+  submissionTime?: string;
+  completionTime?: string;
+  duration?: number;
+  numTasks: number;
+  numCompletedTasks: number;
+  numFailedTasks: number;
+  numSkippedTasks: number;
+  numCompletedStages: number;
+  numFailedStages: number;
+
   metrics: SparkMetricsStore;
 }
 
