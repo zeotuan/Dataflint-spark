@@ -1,9 +1,10 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import {
+  Autocomplete,
   Box,
   Button,
-  Checkbox,
   Chip,
+  CircularProgress,
   Fade,
   IconButton,
   Paper,
@@ -18,124 +19,57 @@ import {
   Typography,
 } from "@mui/material";
 import * as React from "react";
-import { useSearchParams } from "react-router-dom";
 import { useAppSelector } from "../Hooks";
-import { SparkJobStore } from "../interfaces/AppStore";
+import { useAppCompare } from "../hooks/useAppCompare";
+import { sumMetricStores } from "../reducers/MetricsReducer";
 import {
+  AppCompareData,
   buildCompareMetricGroups,
   getDeltaColor,
 } from "../utils/CompareUtils";
 
-function statusColor(status: string): "success" | "error" | "warning" | "info" | "default" {
-  switch (status.toUpperCase()) {
-    case "SUCCEEDED":
-      return "success";
-    case "FAILED":
-      return "error";
-    case "RUNNING":
-      return "info";
-    default:
-      return "default";
+/** Build AppCompareData for the current app from Redux store */
+function buildCurrentAppData(
+  runMetadata: { appId: string; appName: string; sparkVersion: string; endTime?: number; startTime: number },
+  status: { duration: number } | undefined,
+  jobs: { numTasks: number; numCompletedTasks: number; numFailedTasks: number; numSkippedTasks: number; numCompletedStages: number; numFailedStages: number; metrics: any }[] | undefined,
+  stages: { stageId: number; metrics: any }[] | undefined,
+  executors: { id: string }[] | undefined,
+): AppCompareData {
+  const allMetrics = (stages ?? []).map((s) => s.metrics);
+  const aggregated = sumMetricStores(allMetrics);
+
+  let totalTasks = 0, completedTasks = 0, failedTasks = 0, skippedTasks = 0;
+  let completedStages = 0, failedStages = 0;
+  for (const job of (jobs ?? [])) {
+    totalTasks += job.numTasks ?? 0;
+    completedTasks += job.numCompletedTasks ?? 0;
+    failedTasks += job.numFailedTasks ?? 0;
+    skippedTasks += job.numSkippedTasks ?? 0;
+    completedStages += job.numCompletedStages ?? 0;
+    failedStages += job.numFailedStages ?? 0;
   }
-}
+  let skippedStages = (stages?.length ?? 0) - completedStages - failedStages;
+  if (skippedStages < 0) skippedStages = 0;
 
-function JobSelectionTable({
-  jobs,
-  selected,
-  onToggle,
-  onCompare,
-}: {
-  jobs: SparkJobStore[];
-  selected: Set<number>;
-  onToggle: (jobId: number) => void;
-  onCompare: () => void;
-}) {
-  const [filter, setFilter] = React.useState("");
-
-  const filtered = React.useMemo(() => {
-    if (!filter) return jobs;
-    const lower = filter.toLowerCase();
-    return jobs.filter(
-      (j) =>
-        j.jobId.toString().includes(lower) ||
-        j.name.toLowerCase().includes(lower) ||
-        j.description.toLowerCase().includes(lower),
-    );
-  }, [jobs, filter]);
-
-  return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
-        <Typography variant="h6">Select two jobs to compare</Typography>
-        <TextField
-          size="small"
-          placeholder="Filter by ID or name…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          sx={{ ml: "auto", width: 250 }}
-        />
-        <Button
-          variant="contained"
-          disabled={selected.size !== 2}
-          onClick={onCompare}
-        >
-          Compare
-        </Button>
-      </Box>
-      <TableContainer component={Paper} sx={{ maxHeight: "calc(100vh - 200px)" }}>
-        <Table stickyHeader size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox" />
-              <TableCell>Job ID</TableCell>
-              <TableCell>Name / Description</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Tasks</TableCell>
-              <TableCell align="right">Stages</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filtered.map((job) => {
-              const isSelected = selected.has(job.jobId);
-              const disabled = !isSelected && selected.size >= 2;
-              return (
-                <TableRow
-                  key={job.jobId}
-                  hover
-                  onClick={() => !disabled && onToggle(job.jobId)}
-                  sx={{ cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1 }}
-                >
-                  <TableCell padding="checkbox">
-                    <Checkbox checked={isSelected} disabled={disabled} />
-                  </TableCell>
-                  <TableCell>{job.jobId}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>
-                      {job.name || job.description || `Job ${job.jobId}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={job.status} color={statusColor(job.status)} size="small" />
-                  </TableCell>
-                  <TableCell align="right">{job.numTasks.toLocaleString()}</TableCell>
-                  <TableCell align="right">{job.stageIds.length}</TableCell>
-                </TableRow>
-              );
-            })}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} align="center">
-                  <Typography color="text.secondary" sx={{ py: 4 }}>
-                    {jobs.length === 0 ? "No jobs available" : "No jobs match filter"}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
+  return {
+    appId: runMetadata.appId,
+    appName: runMetadata.appName,
+    duration: status?.duration,
+    totalJobs: jobs?.length ?? 0,
+    totalStages: stages?.length ?? 0,
+    totalExecutors: executors?.filter((e) => e.id !== "driver").length ?? 0,
+    totalTasks,
+    completedTasks,
+    failedTasks,
+    skippedTasks,
+    completedStages,
+    failedStages,
+    skippedStages,
+    status: runMetadata.endTime ? "COMPLETED" : "RUNNING",
+    sparkVersion: runMetadata.sparkVersion,
+    metrics: aggregated,
+  };
 }
 
 function ComparisonView({
@@ -143,8 +77,8 @@ function ComparisonView({
   right,
   onBack,
 }: {
-  left: SparkJobStore;
-  right: SparkJobStore;
+  left: AppCompareData;
+  right: AppCompareData;
   onBack: () => void;
 }) {
   const groups = React.useMemo(() => buildCompareMetricGroups(left, right), [left, right]);
@@ -158,34 +92,40 @@ function ComparisonView({
               <ArrowBackIcon />
             </IconButton>
           </Tooltip>
-          <Typography variant="h6">
-            Job {left.jobId} vs Job {right.jobId}
-          </Typography>
+          <Typography variant="h6">Application Comparison</Typography>
         </Box>
 
-        {/* Job header info */}
+        {/* App header cards */}
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-          <Paper sx={{ flex: 1, p: 1.5 }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Job {left.jobId} (Left)
-            </Typography>
-            <Typography variant="body2" noWrap>
-              {left.name || left.description || `Job ${left.jobId}`}
-            </Typography>
-            <Chip label={left.status} color={statusColor(left.status)} size="small" sx={{ mt: 0.5 }} />
-          </Paper>
-          <Paper sx={{ flex: 1, p: 1.5 }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Job {right.jobId} (Right)
-            </Typography>
-            <Typography variant="body2" noWrap>
-              {right.name || right.description || `Job ${right.jobId}`}
-            </Typography>
-            <Chip label={right.status} color={statusColor(right.status)} size="small" sx={{ mt: 0.5 }} />
-          </Paper>
+          {[
+            { label: "Current App (Left)", data: left },
+            { label: "Compare App (Right)", data: right },
+          ].map(({ label, data }) => (
+            <Paper key={label} sx={{ flex: 1, p: 1.5 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                {label}
+              </Typography>
+              <Typography variant="body2" fontWeight={600} noWrap>
+                {data.appName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {data.appId}
+              </Typography>
+              <Box sx={{ mt: 0.5, display: "flex", gap: 1, alignItems: "center" }}>
+                <Chip
+                  label={data.status}
+                  color={data.status === "COMPLETED" ? "success" : "info"}
+                  size="small"
+                />
+                {data.sparkVersion && (
+                  <Chip label={`Spark ${data.sparkVersion}`} size="small" variant="outlined" />
+                )}
+              </Box>
+            </Paper>
+          ))}
         </Box>
 
-        {/* Metrics comparison by category */}
+        {/* Metrics by category */}
         {groups.map((group) => (
           <TableContainer component={Paper} key={group.category} sx={{ mb: 2 }}>
             <Table size="small">
@@ -199,8 +139,8 @@ function ComparisonView({
                 </TableRow>
                 <TableRow>
                   <TableCell>Metric</TableCell>
-                  <TableCell align="right">Job {left.jobId}</TableCell>
-                  <TableCell align="right">Job {right.jobId}</TableCell>
+                  <TableCell align="right">Current App</TableCell>
+                  <TableCell align="right">Compare App</TableCell>
                   <TableCell align="right">Delta</TableCell>
                 </TableRow>
               </TableHead>
@@ -216,7 +156,10 @@ function ComparisonView({
                       </TableCell>
                       <TableCell align="right">{m.leftValue}</TableCell>
                       <TableCell align="right">{m.rightValue}</TableCell>
-                      <TableCell align="right" sx={{ color: color ?? "text.secondary", fontWeight: color ? 600 : 400 }}>
+                      <TableCell
+                        align="right"
+                        sx={{ color: color ?? "text.secondary", fontWeight: color ? 600 : 400 }}
+                      >
                         {m.delta}
                       </TableCell>
                     </TableRow>
@@ -232,70 +175,160 @@ function ComparisonView({
 }
 
 export function JobCompareTab() {
+  const runMetadata = useAppSelector((state) => state.spark.runMetadata);
+  const status = useAppSelector((state) => state.spark.status);
   const jobs = useAppSelector((state) => state.spark.jobs);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selected, setSelected] = React.useState<Set<number>>(new Set());
+  const stages = useAppSelector((state) => state.spark.stages);
+  const executors = useAppSelector((state) => state.spark.executors);
 
-  // Hydrate selection from URL on mount
-  const leftParam = searchParams.get("left");
-  const rightParam = searchParams.get("right");
-  const comparing = leftParam !== null && rightParam !== null;
+  const {
+    apps,
+    appsLoading,
+    appsError,
+    compareData,
+    compareLoading,
+    compareError,
+    fetchCompareData,
+    clearCompareData,
+  } = useAppCompare();
 
-  const leftJob = comparing
-    ? jobs?.find((j) => j.jobId === Number(leftParam))
-    : undefined;
-  const rightJob = comparing
-    ? jobs?.find((j) => j.jobId === Number(rightParam))
-    : undefined;
+  const [selectedAppId, setSelectedAppId] = React.useState<string | null>(null);
+  const [comparing, setComparing] = React.useState(false);
 
-  const handleToggle = (jobId: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) {
-        next.delete(jobId);
-      } else if (next.size < 2) {
-        next.add(jobId);
-      }
-      return next;
-    });
-  };
+  const availableApps = React.useMemo(
+    () => apps.filter((a) => a.id !== runMetadata?.appId),
+    [apps, runMetadata?.appId],
+  );
+
+  const currentAppData = React.useMemo(() => {
+    if (!runMetadata) return undefined;
+    return buildCurrentAppData(runMetadata, status, jobs, stages, executors);
+  }, [runMetadata, status, jobs, stages, executors]);
 
   const handleCompare = () => {
-    const ids = Array.from(selected).sort((a, b) => a - b);
-    if (ids.length === 2) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.set("left", String(ids[0]));
-      newParams.set("right", String(ids[1]));
-      setSearchParams(newParams);
-    }
+    if (!selectedAppId) return;
+    const app = apps.find((a) => a.id === selectedAppId);
+    const attemptId = app?.attempts?.[app.attempts.length - 1]?.attemptId;
+    fetchCompareData(selectedAppId, attemptId);
+    setComparing(true);
   };
 
   const handleBack = () => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("left");
-    newParams.delete("right");
-    setSearchParams(newParams);
-    setSelected(new Set());
+    setComparing(false);
+    clearCompareData();
   };
 
-  if (!jobs || jobs.length === 0) {
+  if (!runMetadata || !currentAppData) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
-        <Typography color="text.secondary">No jobs available yet</Typography>
+        <Typography color="text.secondary">Waiting for application data…</Typography>
       </Box>
     );
   }
 
-  if (comparing && leftJob && rightJob) {
-    return <ComparisonView left={leftJob} right={rightJob} onBack={handleBack} />;
+  if (comparing && compareData && currentAppData) {
+    return (
+      <ComparisonView left={currentAppData} right={compareData} onBack={handleBack} />
+    );
   }
 
   return (
-    <JobSelectionTable
-      jobs={jobs}
-      selected={selected}
-      onToggle={handleToggle}
-      onCompare={handleCompare}
-    />
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Compare Applications
+      </Typography>
+
+      {/* Current app info */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Current Application
+        </Typography>
+        <Typography variant="body1" fontWeight={600}>
+          {currentAppData.appName}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {currentAppData.appId}
+        </Typography>
+        <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+          <Chip label={currentAppData.status} color="success" size="small" />
+          {currentAppData.sparkVersion && (
+            <Chip label={`Spark ${currentAppData.sparkVersion}`} size="small" variant="outlined" />
+          )}
+          <Chip label={`${currentAppData.totalJobs} jobs`} size="small" variant="outlined" />
+          <Chip label={`${currentAppData.totalStages} stages`} size="small" variant="outlined" />
+        </Box>
+      </Paper>
+
+      {/* Select second app */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Select Application to Compare
+        </Typography>
+
+        {appsError && (
+          <Typography color="error" sx={{ mb: 1 }}>
+            Failed to load applications: {appsError}
+          </Typography>
+        )}
+
+        <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+          <Autocomplete
+            sx={{ flex: 1 }}
+            options={availableApps}
+            loading={appsLoading}
+            getOptionLabel={(option) =>
+              `${option.name} (${option.id.substring(option.id.length - 8)})`
+            }
+            renderOption={(props, option) => {
+              const attempt = option.attempts?.[option.attempts.length - 1];
+              return (
+                <li {...props} key={option.id}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>
+                      {option.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {option.id} • {attempt?.appSparkVersion ?? "unknown"} •{" "}
+                      {attempt?.startTime ?? ""}
+                    </Typography>
+                  </Box>
+                </li>
+              );
+            }}
+            onChange={(_, value) => setSelectedAppId(value?.id ?? null)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search applications…"
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {appsLoading && <CircularProgress size={20} />}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+          />
+          <Button
+            variant="contained"
+            disabled={!selectedAppId || compareLoading}
+            onClick={handleCompare}
+            sx={{ minWidth: 120 }}
+          >
+            {compareLoading ? <CircularProgress size={20} /> : "Compare"}
+          </Button>
+        </Box>
+
+        {compareError && (
+          <Typography color="error" sx={{ mt: 1 }}>
+            Failed to fetch comparison data: {compareError}
+          </Typography>
+        )}
+      </Paper>
+    </Box>
   );
 }

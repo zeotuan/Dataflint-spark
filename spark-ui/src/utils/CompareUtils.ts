@@ -1,8 +1,28 @@
 import { duration } from "moment";
-import { SparkJobStore } from "../interfaces/AppStore";
+import { SparkMetricsStore } from "../interfaces/AppStore";
 import { humanFileSize, humanizeTimeDiff } from "./FormatUtils";
 
 export type MetricDirection = "lower-is-better" | "higher-is-better" | "neutral";
+
+export interface AppCompareData {
+  appId: string;
+  attemptId?: string;
+  appName: string;
+  duration?: number;
+  totalJobs: number;
+  totalStages: number;
+  totalExecutors: number;
+  totalTasks: number;
+  completedTasks: number;
+  failedTasks: number;
+  skippedTasks: number;
+  completedStages: number;
+  failedStages: number;
+  skippedStages: number;
+  status: string;
+  sparkVersion?: string;
+  metrics: SparkMetricsStore;
+}
 
 export interface CompareMetricGroup {
   category: string;
@@ -72,18 +92,22 @@ function buildMetric(
   };
 }
 
-export function buildCompareMetricGroups(left: SparkJobStore, right: SparkJobStore): CompareMetricGroup[] {
+export function buildCompareMetricGroups(left: AppCompareData, right: AppCompareData): CompareMetricGroup[] {
   return [
     {
       category: "Overview",
       metrics: [
         buildMetric("Duration (Wall Clock)", left.duration ?? 0, right.duration ?? 0, formatDurationMs, "lower-is-better"),
-        buildMetric("Total Tasks", left.numTasks, right.numTasks, formatCount, "neutral"),
-        buildMetric("Completed Tasks", left.numCompletedTasks, right.numCompletedTasks, formatCount, "neutral"),
-        buildMetric("Failed Tasks", left.numFailedTasks, right.numFailedTasks, formatCount, "lower-is-better"),
-        buildMetric("Skipped Tasks", left.numSkippedTasks, right.numSkippedTasks, formatCount, "neutral"),
-        buildMetric("Completed Stages", left.numCompletedStages, right.numCompletedStages, formatCount, "neutral"),
-        buildMetric("Failed Stages", left.numFailedStages, right.numFailedStages, formatCount, "lower-is-better"),
+        buildMetric("Total Jobs", left.totalJobs, right.totalJobs, formatCount, "neutral"),
+        buildMetric("Total Stages", left.totalStages, right.totalStages, formatCount, "neutral"),
+        buildMetric("Total Executors", left.totalExecutors, right.totalExecutors, formatCount, "neutral"),
+        buildMetric("Total Tasks", left.totalTasks, right.totalTasks, formatCount, "neutral"),
+        buildMetric("Completed Tasks", left.completedTasks, right.completedTasks, formatCount, "neutral"),
+        buildMetric("Failed Tasks", left.failedTasks, right.failedTasks, formatCount, "lower-is-better"),
+        buildMetric("Skipped Tasks", left.skippedTasks, right.skippedTasks, formatCount, "neutral"),
+        buildMetric("Completed Stages", left.completedStages, right.completedStages, formatCount, "neutral"),
+        buildMetric("Failed Stages", left.failedStages, right.failedStages, formatCount, "lower-is-better"),
+        buildMetric("Skipped Stages", left.skippedStages, right.skippedStages, formatCount, "neutral"),
       ],
     },
     {
@@ -129,7 +153,7 @@ export function buildCompareMetricGroups(left: SparkJobStore, right: SparkJobSto
 }
 
 /** Flat list for backward compatibility with tests */
-export function buildCompareMetrics(left: SparkJobStore, right: SparkJobStore): CompareMetric[] {
+export function buildCompareMetrics(left: AppCompareData, right: AppCompareData): CompareMetric[] {
   return buildCompareMetricGroups(left, right).flatMap((g) => g.metrics);
 }
 

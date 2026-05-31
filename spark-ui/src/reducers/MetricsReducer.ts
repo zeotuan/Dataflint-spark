@@ -147,7 +147,34 @@ export function calculatePartitionSkew(stage: SparkStage) {
   return { hasPartitionSkew: false, medianTaskDuration, maxTaskDuration };
 }
 
-function sumMetricStores(metrics: SparkMetricsStore[]): SparkMetricsStore {
+/** Extracts SparkMetricsStore from a raw Spark REST API stage object.
+ *  Reusable for both current-app Redux pipeline and second-app direct fetch. */
+export function stageApiToMetrics(stage: SparkStage): SparkMetricsStore {
+  return {
+    executorRunTime: stage.executorRunTime,
+    executorCpuTime: stage.executorCpuTime,
+    executorDeserializeTime: stage.executorDeserializeTime,
+    resultSerializationTime: stage.resultSerializationTime,
+    jvmGcTime: stage.jvmGcTime,
+    peakExecutionMemory: stage.peakExecutionMemory,
+    memoryBytesSpilled: stage.memoryBytesSpilled,
+    diskBytesSpilled: stage.diskBytesSpilled,
+    inputBytes: stage.inputBytes,
+    inputRecords: stage.inputRecords,
+    outputBytes: stage.outputBytes,
+    outputRecords: stage.outputRecords,
+    shuffleReadBytes: stage.shuffleReadBytes,
+    shuffleReadRecords: stage.shuffleReadRecords,
+    shuffleFetchWaitTime: stage.shuffleFetchWaitTime,
+    shuffleWriteBytes: stage.shuffleWriteBytes,
+    shuffleWriteTime: stage.shuffleWriteTime,
+    shuffleWriteRecords: stage.shuffleWriteRecords,
+    resultSize: stage.resultSize,
+    totalTasks: stage.numTasks,
+  };
+}
+
+export function sumMetricStores(metrics: SparkMetricsStore[]): SparkMetricsStore {
   const sum = (field: keyof SparkMetricsStore) =>
     metrics.map((m) => m[field]).reduce((a, b) => a + b, 0);
   const max = (field: keyof SparkMetricsStore) =>
