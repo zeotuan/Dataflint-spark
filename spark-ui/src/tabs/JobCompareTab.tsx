@@ -22,7 +22,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAppSelector } from "../Hooks";
 import { SparkJobStore } from "../interfaces/AppStore";
 import {
-  buildCompareMetrics,
+  buildCompareMetricGroups,
   getDeltaColor,
 } from "../utils/CompareUtils";
 
@@ -147,7 +147,7 @@ function ComparisonView({
   right: SparkJobStore;
   onBack: () => void;
 }) {
-  const metrics = React.useMemo(() => buildCompareMetrics(left, right), [left, right]);
+  const groups = React.useMemo(() => buildCompareMetricGroups(left, right), [left, right]);
 
   return (
     <Fade in>
@@ -185,38 +185,47 @@ function ComparisonView({
           </Paper>
         </Box>
 
-        {/* Metrics comparison */}
-        <TableContainer component={Paper}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Metric</TableCell>
-                <TableCell align="right">Job {left.jobId}</TableCell>
-                <TableCell align="right">Job {right.jobId}</TableCell>
-                <TableCell align="right">Delta</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {metrics.map((m) => {
-                const color = getDeltaColor(m);
-                return (
-                  <TableRow key={m.label}>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={500}>
-                        {m.label}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">{m.leftValue}</TableCell>
-                    <TableCell align="right">{m.rightValue}</TableCell>
-                    <TableCell align="right" sx={{ color: color ?? "text.secondary", fontWeight: color ? 600 : 400 }}>
-                      {m.delta}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        {/* Metrics comparison by category */}
+        {groups.map((group) => (
+          <TableContainer component={Paper} key={group.category} sx={{ mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell colSpan={4} sx={{ bgcolor: "action.hover" }}>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      {group.category}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Metric</TableCell>
+                  <TableCell align="right">Job {left.jobId}</TableCell>
+                  <TableCell align="right">Job {right.jobId}</TableCell>
+                  <TableCell align="right">Delta</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {group.metrics.map((m) => {
+                  const color = getDeltaColor(m);
+                  return (
+                    <TableRow key={m.label}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={500}>
+                          {m.label}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">{m.leftValue}</TableCell>
+                      <TableCell align="right">{m.rightValue}</TableCell>
+                      <TableCell align="right" sx={{ color: color ?? "text.secondary", fontWeight: color ? 600 : 400 }}>
+                        {m.delta}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ))}
       </Box>
     </Fade>
   );

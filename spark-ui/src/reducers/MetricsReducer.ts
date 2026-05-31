@@ -104,11 +104,24 @@ export function calculateStagesStore(
           partitionSkew?.maxTaskDuration,
         metrics: {
           executorRunTime: stage.executorRunTime,
+          executorCpuTime: stage.executorCpuTime,
+          executorDeserializeTime: stage.executorDeserializeTime,
+          resultSerializationTime: stage.resultSerializationTime,
+          jvmGcTime: stage.jvmGcTime,
+          peakExecutionMemory: stage.peakExecutionMemory,
+          memoryBytesSpilled: stage.memoryBytesSpilled,
           diskBytesSpilled: stage.diskBytesSpilled,
           inputBytes: stage.inputBytes,
+          inputRecords: stage.inputRecords,
           outputBytes: stage.outputBytes,
+          outputRecords: stage.outputRecords,
           shuffleReadBytes: stage.shuffleReadBytes,
+          shuffleReadRecords: stage.shuffleReadRecords,
+          shuffleFetchWaitTime: stage.shuffleFetchWaitTime,
           shuffleWriteBytes: stage.shuffleWriteBytes,
+          shuffleWriteTime: stage.shuffleWriteTime,
+          shuffleWriteRecords: stage.shuffleWriteRecords,
+          resultSize: stage.resultSize,
           totalTasks: stage.numTasks,
         },
       };
@@ -135,30 +148,33 @@ export function calculatePartitionSkew(stage: SparkStage) {
 }
 
 function sumMetricStores(metrics: SparkMetricsStore[]): SparkMetricsStore {
-  const jobsMetricsStore: SparkMetricsStore = {
-    executorRunTime: metrics
-      .map((metrics) => metrics.executorRunTime)
-      .reduce((a, b) => a + b, 0),
-    diskBytesSpilled: metrics
-      .map((metrics) => metrics.diskBytesSpilled)
-      .reduce((a, b) => a + b, 0),
-    inputBytes: metrics
-      .map((metrics) => metrics.inputBytes)
-      .reduce((a, b) => a + b, 0),
-    outputBytes: metrics
-      .map((metrics) => metrics.outputBytes)
-      .reduce((a, b) => a + b, 0),
-    shuffleReadBytes: metrics
-      .map((metrics) => metrics.shuffleReadBytes)
-      .reduce((a, b) => a + b, 0),
-    shuffleWriteBytes: metrics
-      .map((metrics) => metrics.shuffleWriteBytes)
-      .reduce((a, b) => a + b, 0),
-    totalTasks: metrics
-      .map((metrics) => metrics.totalTasks)
-      .reduce((a, b) => a + b, 0),
+  const sum = (field: keyof SparkMetricsStore) =>
+    metrics.map((m) => m[field]).reduce((a, b) => a + b, 0);
+  const max = (field: keyof SparkMetricsStore) =>
+    metrics.length === 0 ? 0 : Math.max(...metrics.map((m) => m[field]));
+
+  return {
+    executorRunTime: sum("executorRunTime"),
+    executorCpuTime: sum("executorCpuTime"),
+    executorDeserializeTime: sum("executorDeserializeTime"),
+    resultSerializationTime: sum("resultSerializationTime"),
+    jvmGcTime: sum("jvmGcTime"),
+    peakExecutionMemory: max("peakExecutionMemory"),
+    memoryBytesSpilled: sum("memoryBytesSpilled"),
+    diskBytesSpilled: sum("diskBytesSpilled"),
+    inputBytes: sum("inputBytes"),
+    inputRecords: sum("inputRecords"),
+    outputBytes: sum("outputBytes"),
+    outputRecords: sum("outputRecords"),
+    shuffleReadBytes: sum("shuffleReadBytes"),
+    shuffleReadRecords: sum("shuffleReadRecords"),
+    shuffleFetchWaitTime: sum("shuffleFetchWaitTime"),
+    shuffleWriteBytes: sum("shuffleWriteBytes"),
+    shuffleWriteTime: sum("shuffleWriteTime"),
+    shuffleWriteRecords: sum("shuffleWriteRecords"),
+    resultSize: sum("resultSize"),
+    totalTasks: sum("totalTasks"),
   };
-  return jobsMetricsStore;
 }
 
 export function calculateJobsMetrics(

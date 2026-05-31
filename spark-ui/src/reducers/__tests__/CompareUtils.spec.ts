@@ -1,5 +1,6 @@
 import { SparkJobStore, SparkMetricsStore } from "../../interfaces/AppStore";
 import {
+  buildCompareMetricGroups,
   buildCompareMetrics,
   computeDelta,
   formatDurationMs,
@@ -10,11 +11,24 @@ function makeMetrics(overrides?: Partial<SparkMetricsStore>): SparkMetricsStore 
   return {
     totalTasks: 100,
     executorRunTime: 60000,
+    executorCpuTime: 50000,
+    executorDeserializeTime: 2000,
+    resultSerializationTime: 500,
+    jvmGcTime: 3000,
+    peakExecutionMemory: 256 * 1024 * 1024,
+    memoryBytesSpilled: 0,
     diskBytesSpilled: 0,
     inputBytes: 1024 * 1024,
+    inputRecords: 10000,
     outputBytes: 512 * 1024,
+    outputRecords: 5000,
     shuffleReadBytes: 2048,
+    shuffleReadRecords: 200,
+    shuffleFetchWaitTime: 1000,
     shuffleWriteBytes: 1024,
+    shuffleWriteTime: 800,
+    shuffleWriteRecords: 100,
+    resultSize: 4096,
     ...overrides,
   };
 }
@@ -102,20 +116,52 @@ describe("formatDurationMs", () => {
 });
 
 describe("buildCompareMetrics", () => {
-  it("returns all expected metrics", () => {
+  it("returns all expected metrics across categories", () => {
     const left = makeJob(1);
     const right = makeJob(2);
     const metrics = buildCompareMetrics(left, right);
 
     const labels = metrics.map((m) => m.label);
-    expect(labels).toContain("Duration");
-    expect(labels).toContain("Executor Run Time");
+    // Overview
+    expect(labels).toContain("Duration (Wall Clock)");
     expect(labels).toContain("Total Tasks");
     expect(labels).toContain("Failed Tasks");
-    expect(labels).toContain("Disk Spill");
-    expect(labels).toContain("Input");
-    expect(labels).toContain("Shuffle Read");
-    expect(metrics.length).toBe(13);
+    // Time Breakdown
+    expect(labels).toContain("Executor Run Time");
+    expect(labels).toContain("Executor CPU Time");
+    expect(labels).toContain("JVM GC Time");
+    expect(labels).toContain("Executor Deserialize Time");
+    expect(labels).toContain("Result Serialization Time");
+    // I/O
+    expect(labels).toContain("Input Bytes");
+    expect(labels).toContain("Input Records");
+    expect(labels).toContain("Output Bytes");
+    expect(labels).toContain("Output Records");
+    // Shuffle
+    expect(labels).toContain("Shuffle Read Bytes");
+    expect(labels).toContain("Shuffle Read Records");
+    expect(labels).toContain("Shuffle Fetch Wait Time");
+    expect(labels).toContain("Shuffle Write Bytes");
+    expect(labels).toContain("Shuffle Write Time");
+    expect(labels).toContain("Shuffle Write Records");
+    // Memory & Spill
+    expect(labels).toContain("Peak Execution Memory");
+    expect(labels).toContain("Memory Bytes Spilled");
+    expect(labels).toContain("Disk Bytes Spilled");
+    expect(labels).toContain("Result Size");
+    expect(metrics.length).toBe(26);
+  });
+
+  it("returns 5 category groups", () => {
+    const groups = buildCompareMetricGroups(makeJob(1), makeJob(2));
+    const categories = groups.map((g) => g.category);
+    expect(categories).toEqual([
+      "Overview",
+      "Time Breakdown",
+      "Input / Output",
+      "Shuffle",
+      "Memory & Spill",
+    ]);
   });
 
   it("computes zero delta when jobs are identical", () => {
@@ -135,6 +181,25 @@ describe("buildCompareMetrics", () => {
     const failedMetric = metrics.find((m) => m.label === "Failed Tasks")!;
     expect(failedMetric.deltaRaw).toBe(10);
     expect(failedMetric.direction).toBe("lower-is-better");
+  });
+
+  it("detects GC time regression", () => {
+    const left = makeJob(1, { metrics: makeMetrics({ jvmGcTime: 1000 }) });
+    const right = makeJob(2, { metrics: makeMetrics({ jvmGcTime: 5000 }) });
+    const metrics = buildCompareMetrics(left, right);
+    const gcMetric = metrics.find((m) => m.label === "JVM GC Time")!;
+    expect(gcMetric.deltaRaw).toBe(4000);
+    expect(gcMetric.direction).toBe("lower-is-better");
+    expect(getDeltaColor(gcMetric)).toBe("#c62828"); // red = regression
+  });
+
+  it("detects shuffle improvement", () => {
+    const left = makeJob(1, { metrics: makeMetrics({ shuffleReadBytes: 10000 }) });
+    const right = makeJob(2, { metrics: makeMetrics({ shuffleReadBytes: 5000 }) });
+    const metrics = buildCompareMetrics(left, right);
+    const shuffleMetric = metrics.find((m) => m.label === "Shuffle Read Bytes")!;
+    expect(shuffleMetric.deltaRaw).toBe(-5000);
+    expect(getDeltaColor(shuffleMetric)).toBe("#2e7d32"); // green = improvement
   });
 });
 
