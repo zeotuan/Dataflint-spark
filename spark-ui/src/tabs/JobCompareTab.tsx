@@ -85,7 +85,7 @@ function ComparisonView({
 
   return (
     <Fade in>
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1 }}>
           <Tooltip title="Back to selection">
             <IconButton onClick={onBack} size="small">
@@ -233,7 +233,7 @@ export function JobCompareTab() {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2, height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
       <Typography variant="h6" gutterBottom>
         Compare Applications
       </Typography>
