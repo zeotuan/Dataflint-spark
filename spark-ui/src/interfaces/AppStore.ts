@@ -398,11 +398,24 @@ export interface SparkExecutorsStatus {
 export interface SparkMetricsStore {
   totalTasks: number;
   executorRunTime: number;
+  executorCpuTime: number;
+  executorDeserializeTime: number;
+  resultSerializationTime: number;
+  jvmGcTime: number;
+  peakExecutionMemory: number;
+  memoryBytesSpilled: number;
   diskBytesSpilled: number;
   inputBytes: number;
+  inputRecords: number;
   outputBytes: number;
+  outputRecords: number;
   shuffleReadBytes: number;
+  shuffleReadRecords: number;
+  shuffleFetchWaitTime: number;
   shuffleWriteBytes: number;
+  shuffleWriteTime: number;
+  shuffleWriteRecords: number;
+  resultSize: number;
 }
 
 export interface SparkSQLResourceUsageStore {
@@ -422,6 +435,16 @@ export interface SparkJobStore {
   description: string;
   stageIds: number[];
   status: string;
+
+  submissionTime?: string;
+  completionTime?: string;
+  duration?: number;
+  numTasks: number;
+  numCompletedTasks: number;
+  numFailedTasks: number;
+  numSkippedTasks: number;
+  numCompletedStages: number;
+  numFailedStages: number;
 
   metrics: SparkMetricsStore;
 }

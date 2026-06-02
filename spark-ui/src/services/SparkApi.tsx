@@ -24,7 +24,7 @@ import {
 } from "../reducers/SparkSlice";
 import { AppDispatch } from "../Store";
 import { humanFileSize, timeStrToEpocTime } from "../utils/FormatUtils";
-import { IS_HISTORY_SERVER_MODE } from "../utils/UrlConsts";
+import { IS_DEV_HISTORY_MODE, IS_HISTORY_SERVER_MODE } from "../utils/UrlConsts";
 import { isDataFlintSaaSUI } from "../utils/UrlUtils";
 import { MixpanelService } from "./MixpanelService";
 import { ScarfPixelService } from "./ScarfPixelService";
@@ -68,6 +68,8 @@ class SparkAPI {
   sparkVersion: string | undefined = undefined;
   // When true, use non-paginated /sql endpoint (for older Spark apps where paginated API returns 404)
   useLegacySqlApi: boolean = false;
+  // Tracks whether dev history mode has resolved the app ID
+  private devHistoryResolved: boolean = false;
 
   // Cache for response length+hash to skip processing when data hasn't changed
   // Length is checked first (O(1)), hash only calculated if lengths match
@@ -301,6 +303,19 @@ class SparkAPI {
       }
       if (!this.initialized || !this.isConnected) {
         this.resetState(); // In case of disconnection
+
+        // In dev history mode, discover the first app ID from the History Server
+        // and rewrite baseCurrentPage to include the /history/<appId> prefix.
+        if (IS_DEV_HISTORY_MODE && !this.devHistoryResolved) {
+          const apps = await this.queryData(this.applicationsPath);
+          if (Array.isArray(apps) && apps.length > 0) {
+            const firstAppId = apps[0].id;
+            this.baseCurrentPage = `${this.basePath}/history/${firstAppId}/dataflint`;
+            console.log(`Dev history mode: resolved app ${firstAppId}, baseCurrentPage=${this.baseCurrentPage}`);
+          }
+          this.devHistoryResolved = true;
+        }
+
         const appInfo: ApplicationInfo = await this.queryData(
           this.applicationinfoPath(),
         );

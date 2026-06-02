@@ -16,6 +16,9 @@ let BASE_PATH = "";
 let BASE_CURRENT_PAGE = hrefWithoutEndSlash();
 if (process.env.NODE_ENV === "development") {
   BASE_PATH = process.env.REACT_APP_BASE_PATH ?? "";
+  // In dev history mode, BASE_CURRENT_PAGE is resolved dynamically by SparkAPI
+  // after discovering the app ID from the applications list endpoint.
+  // Set a placeholder that will be overridden before first use.
   BASE_CURRENT_PAGE = `${BASE_PATH}/dataflint`;
 } else if (isProxyMode()) {
   BASE_PATH = getProxyBasePath();
@@ -23,4 +26,4 @@ if (process.env.NODE_ENV === "development") {
   BASE_PATH = "/dataflint-spark-ui";
 }
 
-export { BASE_CURRENT_PAGE, BASE_PATH, IS_HISTORY_SERVER_MODE };
+export { BASE_CURRENT_PAGE, BASE_PATH, IS_DEV_HISTORY_MODE, IS_HISTORY_SERVER_MODE };
